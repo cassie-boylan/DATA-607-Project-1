@@ -1,0 +1,142 @@
+---
+title: "Project 1"
+author: "Cassie Boylan"
+date: "9/19/2020"
+output:
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+install.packages("data.table")
+```
+
+Loading libraries to use
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(RCurl)
+library(plyr)
+library(dplyr)
+library(stringr)
+library(readr)
+library(data.table)
+```
+
+## list of actions for cleaning
+
+1. Read in text file
+    use fill to handle jagged row error
+ 
+ 2. Name data.table columns
+ 3. Drop unused header data
+ 4. Drop rows with junk data
+
+ 5. Subset rows with number and name
+ 6. Subset rows with state and pre-score values
+ 7. Create new column to hold Pre-Score values
+      mutate with string exp?
+
+ 8. Extract the Contestant ID from each Round
+   
+ 9. Match each Round contestant's pair ID to contestant and look at contestant pre-score
+   
+ 10. Sum contestant pre-score and divide by # of contestants to calculate Average Pre-chess Rating'
+  
+ 11. Create new column to hold average pre-chess rating
+ 
+```{r read-in-data}
+
+#x <- getURL('https://raw.githubusercontent.com/cassie-boylan/DATA-607-Project-1/master/tournamentinfo.txt')
+
+tournament <- read.table('https://raw.githubusercontent.com/cassie-boylan/DATA-607-Project-1/master/tournamentinfo.txt', 
+          stringsAsFactors = FALSE,
+           sep = "|",
+          # colClasses = c("factor",rep("character",times =10)),
+           nrows = -1,
+           skip = 1,
+           fill = TRUE,
+           strip.white = TRUE,
+           comment.char = "",
+           allowEscapes = TRUE)
+
+```
+
+Set Column Names
+```{r set-column-names}
+names(tournament)[1] <- "State"
+names(tournament)[2] <- "Name"
+names(tournament)[3] <- "Total Points" 
+names(tournament)[4:10] <- paste("Round", 1:7)
+```
+
+Reshape Data Table
+```{r drop-duplicate-header & extra-column}
+tournament_clean <- tournament[-c(1:3), -11]
+```
+
+Reindex Data Table
+```{r reindex-data.table}
+rownames(tournament_clean) <- 1:nrow(tournament_clean)
+```
+
+Subset into Multiple Data Tables to filter & extract text values
+```{r pull out pair-number-and-name}
+contestants <- tournament_clean %>% 
+  select(Pair_ID = State, Name, `Total Points`) %>%
+  filter(Pair_ID %in% c(grep("^[0-9]+",Pair_ID, value=TRUE)))
+```
+
+```{r pull out state-and-prescore}
+contestants_2 <- tournament_clean %>% 
+  select(State, Pre_Score_Raw = Name) %>%
+  filter(State %in% c(grep("^[A-Z]+",State, value=TRUE)))
+```
+
+
+```{r extract-score-with-tmp-columns}
+contestants_2.0 <-contestants_2 %>%
+  mutate(score = str_sub(Pre_Score_Raw, 14)) %>%
+  mutate(score2 = str_extract(score,"[0-9]{3,4}"))
+
+```
+
+```{r drop-tmp-columns}
+
+contestants_2.1 <- contestants_2.0 %>%
+  select(State, Pre_Score = score2)
+```
+
+```{r}
+rounds <- tournament_clean %>%
+  filter(`Round 1` %in% c(grep("[0-9]",`Round 1`, value=TRUE))) %>%
+  transmute(Pair_ID = State, 
+              Contestant_1 = str_sub(`Round 1`,-2),
+              Contestant_2 = str_sub(`Round 2`,-2),
+              Contestant_3 = str_sub(`Round 3`,-2),
+              Contestant_4 = str_sub(`Round 4`,-2),
+              Contestant_5 = str_sub(`Round 5`,-2),
+              Contestant_6 = str_sub(`Round 6`,-2),
+              Contestant_7 = str_sub(`Round 7`,-2))
+```
+
+Merge Separate Data Tables Together
+```{r merge-clean-data}
+new_df <- merge(contestants, contestants_2.1, by=0, all=TRUE)
+```
+
+```{r}
+total_df <- merge(new_df, rounds, by="Pair_ID", all=TRUE)
+```
+
+Summarize All Contestants Pre-Scores & Divide by Matches
+<!--where I ran out of time
+{r}
+total_df %>%
+  summarize(
+    contestant_summary_score = )
+ ->
+```
+
